@@ -1,0 +1,34 @@
+{
+  "name": "xenu",
+  "version": "0.1.0",
+  "description": "Autonomous X intelligence agent",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "collect": "tsx src/run-collectors.ts",
+    "collect:timeline": "tsx src/collectors/run-single.ts timeline",
+    "collect:engagement": "tsx src/collectors/run-single.ts engagement",
+    "collect:following": "tsx src/collectors/run-single.ts following",
+    "collect:mentions": "tsx src/collectors/run-single.ts mentions",
+    "collect:audience": "tsx src/collectors/run-single.ts audience",
+    "collect:bookmarks": "tsx src/collectors/run-single.ts bookmarks",
+    "analyze": "tsx src/analysis/run-analysis.ts",
+    "db:init": "tsx src/db/init.ts",
+    "db:reset": "tsx src/db/reset.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cron": "^3.2.1",
+    "dotenv": "^16.4.7",
+    "hono": "^4.6.0",
+    "@hono/node-server": "^1.13.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
