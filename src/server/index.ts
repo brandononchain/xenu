@@ -11,6 +11,7 @@ import {
   checkAuth,
 } from "../api/x-client.js";
 import { runAllCollectors, runCollector, collectors } from "../collectors/index.js";
+import { runAllAnalyzers, runAnalyzer, analyzers } from "../analysis/index.js";
 import { createLogger } from "../logger.js";
 
 const log = createLogger("server");
@@ -219,12 +220,66 @@ app.post("/api/collect/:name", async (c) => {
   return c.json({ collector: name, ...result });
 });
 
+// ─── Analysis Routes ────────────────────────────────────
+
+app.get("/api/patterns", (c) => {
+  const db = getDb();
+  const type = c.req.query("type");
+
+  let query = "SELECT * FROM patterns";
+  const params: any[] = [];
+  if (type) {
+    query += " WHERE pattern_type = ?";
+    params.push(type);
+  }
+  query += " ORDER BY computed_at DESC";
+
+  const patterns = db.prepare(query).all(...params);
+  // Parse JSON values
+  const parsed = (patterns as any[]).map(p => ({
+    ...p,
+    pattern_value: JSON.parse(p.pattern_value),
+  }));
+  return c.json({ data: parsed, count: parsed.length });
+});
+
+app.get("/api/patterns/:type/:key", (c) => {
+  const db = getDb();
+  const { type, key } = c.req.param();
+  const pattern = db.prepare(
+    "SELECT * FROM patterns WHERE pattern_type = ? AND pattern_key = ?"
+  ).get(type, key) as any;
+
+  if (!pattern) return c.json({ error: "Pattern not found" }, 404);
+  return c.json({ ...pattern, pattern_value: JSON.parse(pattern.pattern_value) });
+});
+
+app.get("/api/voice", (c) => {
+  const db = getDb();
+  const metrics = db.prepare("SELECT * FROM voice_profile ORDER BY metric").all() as any[];
+  const parsed = metrics.map(m => ({ ...m, value: JSON.parse(m.value) }));
+  return c.json({ data: parsed });
+});
+
+app.post("/api/analyze/:name", async (c) => {
+  const name = c.req.param("name");
+  if (name === "all") {
+    const results = await runAllAnalyzers();
+    return c.json({ results });
+  }
+  if (!analyzers[name]) {
+    return c.json({ error: `Unknown analyzer: ${name}. Available: ${Object.keys(analyzers).join(", ")}` }, 400);
+  }
+  const result = await runAnalyzer(name);
+  return c.json({ analyzer: name, ...result });
+});
+
 // ─── Cron Jobs ──────────────────────────────────────────
 
 let cronJobs: CronJob[] = [];
 
 function setupCronJobs() {
-  // Every 6 hours: timeline, engagement, mentions, bookmarks, sentiment
+  // Every 6 hours: timeline, engagement, mentions, bookmarks, sentiment → then analyze
   const sixHourJob = new CronJob("0 */6 * * *", async () => {
     log.info("Cron: 6-hour collection cycle");
     for (const name of ["timeline", "engagement", "mentions", "bookmarks"]) {
@@ -233,6 +288,10 @@ function setupCronJobs() {
     }
     // Sentiment runs after mentions
     await runCollector("sentiment");
+
+    // Run analysis after fresh data
+    log.info("Cron: Running analysis engine");
+    await runAllAnalyzers();
   });
 
   // Daily at 6am: following, audience
