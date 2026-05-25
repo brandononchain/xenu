@@ -22,6 +22,18 @@ import {
   runOverlapAnalysis,
   runSimilarityAnalysis,
 } from "../scanner/index.js";
+import {
+  addToWatchList,
+  removeFromWatchList,
+  getWatchList,
+  updateWatchInterval,
+  toggleWatch,
+  processWatchList,
+  startBatchScan,
+  getBatchJobStatus,
+  listBatchJobs,
+  getDeltas,
+} from "../scanner/watch.js";
 import { createLogger } from "../logger.js";
 
 const log = createLogger("server");
@@ -351,6 +363,74 @@ app.get("/api/scans/:userId/similarity", (c) => {
   return c.json(result);
 });
 
+/** Get change deltas for a scanned profile */
+app.get("/api/scans/:userId/deltas", (c) => {
+  const userId = c.req.param("userId");
+  const deltas = getDeltas(userId);
+  return c.json({ data: deltas, count: deltas.length });
+});
+
+// ─── Watch List Routes ──────────────────────────────────
+
+app.get("/api/watch", (c) => {
+  const list = getWatchList();
+  return c.json({ data: list, count: list.length });
+});
+
+app.post("/api/watch/:userId", async (c) => {
+  const userId = c.req.param("userId");
+  const body = await c.req.json().catch(() => ({})) as { handle?: string; interval?: string };
+  const handle = body.handle || userId;
+  const interval = (body.interval || "weekly") as "daily" | "weekly" | "biweekly" | "monthly";
+  addToWatchList(handle, userId, interval);
+  return c.json({ added: true, userId, interval });
+});
+
+app.delete("/api/watch/:userId", (c) => {
+  const userId = c.req.param("userId");
+  removeFromWatchList(userId);
+  return c.json({ removed: true, userId });
+});
+
+app.patch("/api/watch/:userId", async (c) => {
+  const userId = c.req.param("userId");
+  const body = await c.req.json().catch(() => ({})) as { interval?: string; enabled?: boolean };
+  if (body.interval) updateWatchInterval(userId, body.interval as any);
+  if (body.enabled !== undefined) toggleWatch(userId, body.enabled);
+  return c.json({ updated: true, userId });
+});
+
+app.post("/api/watch/process", async (c) => {
+  const result = await processWatchList();
+  return c.json(result);
+});
+
+// ─── Batch Scan Routes ──────────────────────────────────
+
+app.post("/api/scan/batch", async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { handles?: string[] };
+  if (!body.handles || !Array.isArray(body.handles) || body.handles.length === 0) {
+    return c.json({ error: "Provide handles array" }, 400);
+  }
+  if (body.handles.length > 50) {
+    return c.json({ error: "Max 50 handles per batch" }, 400);
+  }
+  const jobId = await startBatchScan(body.handles);
+  return c.json({ jobId, total: body.handles.length, status: "pending" });
+});
+
+app.get("/api/scan/batch/:jobId", (c) => {
+  const jobId = c.req.param("jobId");
+  const status = getBatchJobStatus(jobId);
+  if (!status) return c.json({ error: "Job not found" }, 404);
+  return c.json(status);
+});
+
+app.get("/api/scan/batch", (c) => {
+  const jobs = listBatchJobs();
+  return c.json({ data: jobs });
+});
+
 // ─── Cron Jobs ──────────────────────────────────────────
 
 let cronJobs: CronJob[] = [];
@@ -371,20 +451,24 @@ function setupCronJobs() {
     await runAllAnalyzers();
   });
 
-  // Daily at 6am: following, audience
+  // Daily at 6am: following, audience, watch list rescans
   const dailyJob = new CronJob("0 6 * * *", async () => {
     log.info("Cron: Daily collection cycle");
     await runCollector("audience");
     await new Promise(r => setTimeout(r, 2000));
     await runCollector("following");
+
+    // Process watch list rescans
+    log.info("Cron: Processing watch list");
+    await processWatchList();
   });
 
   cronJobs = [sixHourJob, dailyJob];
   cronJobs.forEach(job => job.start());
 
   log.info("Cron jobs scheduled", {
-    sixHour: "0 */6 * * * (timeline, engagement, mentions, bookmarks, sentiment)",
-    daily: "0 6 * * * (following, audience)",
+    sixHour: "0 */6 * * * (timeline, engagement, mentions, bookmarks, sentiment, analysis)",
+    daily: "0 6 * * * (following, audience, watch list rescans)",
   });
 }
 

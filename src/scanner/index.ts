@@ -4,6 +4,8 @@ import { analyzeThreads, type ThreadAnalysis } from "./threads.js";
 import { analyzeTopics, type TopicAnalysis } from "./topics.js";
 import { analyzeFollowerOverlap, type OverlapAnalysis } from "./overlap.js";
 import { computeSimilarity, type SimilarityScore } from "./similarity.js";
+import { analyzeVelocity, type VelocityAnalysis } from "./velocity.js";
+import { analyzeOptimalTiming, type TimingAnalysis } from "./timing.js";
 import { getDb } from "../db/index.js";
 import { createLogger } from "../logger.js";
 
@@ -14,6 +16,8 @@ export interface FullScanResult {
   analysis: { patterns: number };
   threads: ThreadAnalysis | null;
   topics: TopicAnalysis | null;
+  velocity: VelocityAnalysis | null;
+  timing: TimingAnalysis | null;
   durationMs: number;
 }
 
@@ -30,6 +34,8 @@ export async function fullScan(handle: string): Promise<FullScanResult> {
       analysis: { patterns: 0 },
       threads: null,
       topics: null,
+      velocity: null,
+      timing: null,
       durationMs: Date.now() - start,
     };
   }
@@ -64,12 +70,36 @@ export async function fullScan(handle: string): Promise<FullScanResult> {
     log.error("Topic analysis failed", { error: String(err) });
   }
 
+  // Step 5: Engagement velocity
+  let velocityResult: VelocityAnalysis | null = null;
+  try {
+    velocityResult = analyzeVelocity(db, userId);
+    if (velocityResult) {
+      savePattern(db, userId, "velocity", "analysis", velocityResult, 0.85, velocityResult.weeklyEngagement.length);
+    }
+  } catch (err) {
+    log.error("Velocity analysis failed", { error: String(err) });
+  }
+
+  // Step 6: Optimal posting windows
+  let timingResult: TimingAnalysis | null = null;
+  try {
+    timingResult = analyzeOptimalTiming(db, userId);
+    if (timingResult) {
+      savePattern(db, userId, "timing", "analysis", timingResult, 0.8, tweets_count(db, userId));
+    }
+  } catch (err) {
+    log.error("Timing analysis failed", { error: String(err) });
+  }
+
   const duration = Date.now() - start;
   log.info(`Full scan complete: @${handle}`, {
     tweets: scanResult.tweetsCollected,
     patterns: analysisResult.patterns,
     threads: threadResult?.threadCount || 0,
     topics: topicResult?.totalClassified || 0,
+    velocity: velocityResult?.trend || "n/a",
+    timing: timingResult?.bestWindows?.length || 0,
     durationMs: duration,
   });
 
@@ -78,8 +108,14 @@ export async function fullScan(handle: string): Promise<FullScanResult> {
     analysis: analysisResult,
     threads: threadResult,
     topics: topicResult,
+    velocity: velocityResult,
+    timing: timingResult,
     durationMs: duration,
   };
+}
+
+function tweets_count(db: any, userId: string): number {
+  return (db.prepare("SELECT COUNT(*) as c FROM scanned_tweets WHERE user_id = ?").get(userId) as any)?.c || 0;
 }
 
 /** Run follower overlap analysis (separate call — costs extra API reads) */

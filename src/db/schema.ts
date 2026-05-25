@@ -248,4 +248,44 @@ CREATE INDEX IF NOT EXISTS idx_scanned_profiles_handle ON scanned_profiles(handl
 CREATE INDEX IF NOT EXISTS idx_scanned_tweets_user ON scanned_tweets(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_scanned_patterns_user ON scanned_patterns(user_id, pattern_type);
 CREATE INDEX IF NOT EXISTS idx_scanned_voice_user ON scanned_voice(user_id);
+
+-- ─── Watch list (rescan scheduling) ───────────────────
+CREATE TABLE IF NOT EXISTS watch_list (
+  user_id TEXT PRIMARY KEY,
+  handle TEXT NOT NULL,
+  interval TEXT NOT NULL DEFAULT 'weekly',  -- daily, weekly, biweekly, monthly
+  enabled INTEGER DEFAULT 1,
+  last_scan TEXT,
+  next_scan TEXT,
+  added_at TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── Scan deltas (change detection between rescans) ───
+CREATE TABLE IF NOT EXISTS scan_deltas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  scan_date TEXT NOT NULL,
+  delta_type TEXT NOT NULL,  -- followers, engagement, velocity, topics, voice
+  previous_value TEXT,  -- JSON
+  current_value TEXT,   -- JSON
+  change_pct REAL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── Batch scan jobs ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS batch_jobs (
+  id TEXT PRIMARY KEY,
+  handles TEXT NOT NULL,  -- JSON array
+  status TEXT NOT NULL DEFAULT 'pending',  -- pending, running, complete, error
+  total INTEGER DEFAULT 0,
+  completed INTEGER DEFAULT 0,
+  failed INTEGER DEFAULT 0,
+  results TEXT,  -- JSON
+  created_at TEXT DEFAULT (datetime('now')),
+  finished_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_watch_list_next ON watch_list(next_scan, enabled);
+CREATE INDEX IF NOT EXISTS idx_scan_deltas_user ON scan_deltas(user_id, scan_date);
+CREATE INDEX IF NOT EXISTS idx_batch_jobs_status ON batch_jobs(status);
 `;
