@@ -35,6 +35,7 @@ import {
   getDeltas,
 } from "../scanner/watch.js";
 import { createLogger } from "../logger.js";
+import docsRouter from "../docs/index.js";
 
 const log = createLogger("server");
 const app = new Hono();
@@ -42,6 +43,10 @@ const app = new Hono();
 // ─── Middleware ──────────────────────────────────────────
 
 app.use("*", cors());
+
+// ─── Doc Center ─────────────────────────────────────────
+
+app.route("/docs", docsRouter);
 
 // ─── Auth Routes ────────────────────────────────────────
 
@@ -493,8 +498,8 @@ export function startServer() {
   ═══════════════════════════════════════
      Server:    http://localhost:${config.server.port}
      Auth:      http://localhost:${config.server.port}/auth/login
+     Docs:      http://localhost:${config.server.port}/docs
      Status:    http://localhost:${config.server.port}/api/status
-     Dashboard: (connect frontend)
   ═══════════════════════════════════════
   `);
 }
