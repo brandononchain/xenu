@@ -491,3 +491,53 @@ export async function checkAuth(): Promise<boolean> {
   const me = await getMe();
   return !!me?.data;
 }
+
+// ─── Public Profile Scanning Methods ────────────────────
+
+/** Look up a user by handle */
+export async function getUserByHandle(handle: string) {
+  const clean = handle.replace(/^@/, "");
+  return apiRequest<XUser>(`/users/by/username/${clean}`, {
+    params: { "user.fields": USER_FIELDS },
+  });
+}
+
+/** Fetch any user's public tweets by user ID */
+export async function getPublicUserTweets(userId: string, maxPages = 5) {
+  return paginatedRequest<XTweet>(`/users/${userId}/tweets`, {
+    "tweet.fields": TWEET_FIELDS,
+    "user.fields": USER_FIELDS,
+    "media.fields": MEDIA_FIELDS,
+    "expansions": "author_id,referenced_tweets.id,attachments.media_keys",
+    "max_results": "100",
+    "exclude": "retweets",
+  }, maxPages);
+}
+
+/** Fetch any user's followers (sample) */
+export async function getPublicFollowers(userId: string, maxPages = 2) {
+  return paginatedRequest<XUser>(`/users/${userId}/followers`, {
+    "user.fields": USER_FIELDS,
+    "max_results": "1000",
+  }, maxPages);
+}
+
+/** Fetch any user's following list */
+export async function getPublicFollowing(userId: string, maxPages = 2) {
+  return paginatedRequest<XUser>(`/users/${userId}/following`, {
+    "user.fields": USER_FIELDS,
+    "max_results": "1000",
+  }, maxPages);
+}
+
+/** Fetch any user's mentions (requires recent search) */
+export async function getPublicMentions(handle: string, maxPages = 3) {
+  const clean = handle.replace(/^@/, "");
+  return paginatedRequest<XTweet>(`/tweets/search/recent`, {
+    "query": `@${clean} -is:retweet`,
+    "tweet.fields": TWEET_FIELDS,
+    "user.fields": USER_FIELDS,
+    "expansions": "author_id",
+    "max_results": "100",
+  }, maxPages);
+}

@@ -746,6 +746,337 @@ function CollectorsTab() {
   );
 }
 
+// ─── Tab: Scanner (External Profile Intel) ──────────────
+
+function ScanTab() {
+  const [handle, setHandle] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [compareA, setCompareA] = useState(null);
+  const [compareB, setCompareB] = useState(null);
+  const [compareResult, setCompareResult] = useState(null);
+  const { data: scans, loading, refresh } = useApi("/api/scans");
+
+  const profiles = scans?.data || [];
+
+  async function runScan() {
+    if (!handle.trim()) return;
+    setScanning(true);
+    setScanResult(null);
+    setSelectedProfile(null);
+    const res = await apiPost(`/api/scan/${handle.replace(/^@/, "")}`);
+    setScanResult(res);
+    setScanning(false);
+    refresh();
+    if (res?.scan?.userId) loadProfile(res.scan.userId);
+  }
+
+  async function loadProfile(userId) {
+    const res = await api(`/api/scans/${userId}`);
+    setSelectedProfile(res);
+  }
+
+  async function runCompare() {
+    if (!compareA || !compareB) return;
+    const res = await api(`/api/scans/compare/${compareA}/${compareB}`);
+    setCompareResult(res);
+  }
+
+  async function handleDelete(userId) {
+    await fetch(`${API}/api/scans/${userId}`, { method: "DELETE" });
+    setSelectedProfile(null);
+    refresh();
+  }
+
+  const selProfile = selectedProfile?.profile;
+  const selPatterns = selectedProfile?.patterns || [];
+  const selVoice = selectedProfile?.voice || [];
+  const selTweets = selectedProfile?.topTweets || [];
+
+  const getPattern = (type, key) => selPatterns.find(p => p.pattern_type === type && p.pattern_key === key)?.pattern_value;
+  const getVoiceMetric = (metric) => selVoice.find(v => v.metric === metric)?.value;
+
+  const perfSummary = getPattern("content_perf", "summary");
+  const typePerf = getPattern("content_type", "performance") || [];
+  const tone = getVoiceMetric("tone") || {};
+  const vocab = getVoiceMetric("vocabulary") || {};
+  const avgLen = getVoiceMetric("avg_length") || {};
+  const emoji = getVoiceMetric("emoji_rate") || {};
+  const hashFreq = getPattern("hashtag", "frequency") || [];
+  const peakHours = getPattern("posting_time", "peak_hours") || [];
+  const postFreq = getPattern("posting_frequency", "summary") || {};
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Scan input */}
+      <Card>
+        <SectionHeader>Scan External Profile</SectionHeader>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <input
+            value={handle}
+            onChange={e => setHandle(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && runScan()}
+            placeholder="@handle"
+            style={{
+              flex: 1, minWidth: 160, padding: "10px 14px", borderRadius: 8,
+              border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)",
+              color: "#fff", fontSize: 13, fontFamily: mono, outline: "none",
+            }}
+          />
+          <button onClick={runScan} disabled={scanning || !handle.trim()} style={{
+            padding: "10px 20px", borderRadius: 8, border: "none", cursor: scanning ? "wait" : "pointer",
+            background: scanning ? `${XG}20` : XG, color: "#050505", fontSize: 12,
+            fontFamily: mono, fontWeight: 600, transition: "all 0.2s ease",
+            opacity: !handle.trim() ? 0.4 : 1,
+          }}>
+            {scanning ? "Scanning..." : "Scan"}
+          </button>
+        </div>
+        {scanning && (
+          <div style={{ marginTop: 12, fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: mono }}>
+            Fetching tweets and running analysis... this takes 15-30 seconds.
+          </div>
+        )}
+        {scanResult && !scanning && (
+          <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: scanResult.scan?.status === "complete" ? "rgba(0,255,136,0.04)" : "rgba(255,68,68,0.04)", border: `1px solid ${scanResult.scan?.status === "complete" ? "rgba(0,255,136,0.08)" : "rgba(255,68,68,0.08)"}` }}>
+            <span style={{ fontSize: 11, color: scanResult.scan?.status === "complete" ? XG : "#FF4444", fontFamily: mono }}>
+              {scanResult.scan?.status === "complete"
+                ? `Collected ${scanResult.scan?.tweetsCollected} tweets, computed ${scanResult.analysis?.patterns} patterns in ${(scanResult.durationMs / 1000).toFixed(1)}s`
+                : `Error: ${scanResult.scan?.error || "Unknown error"}`}
+            </span>
+          </div>
+        )}
+      </Card>
+
+      {/* Scanned profiles list */}
+      {profiles.length > 0 && (
+        <Card>
+          <SectionHeader>Scanned Profiles ({profiles.length})</SectionHeader>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {profiles.map((p, i) => (
+              <div key={i} onClick={() => loadProfile(p.user_id)} style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
+                background: selProfile?.user_id === p.user_id ? "rgba(0,255,136,0.06)" : "rgba(255,255,255,0.02)",
+                borderRadius: 8, border: selProfile?.user_id === p.user_id ? `1px solid ${XG}20` : "1px solid rgba(255,255,255,0.04)",
+                cursor: "pointer", transition: "all 0.15s ease", flexWrap: "wrap",
+              }}>
+                {p.profile_image_url && <img src={p.profile_image_url} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />}
+                <div style={{ flex: 1, minWidth: 100 }}>
+                  <div style={{ fontSize: 12, color: "#fff", fontFamily: mono }}>@{p.handle}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: mono }}>{p.name}</div>
+                </div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: mono }}>{fmtNum(p.followers)} followers</span>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.15)", fontFamily: mono }}>{timeAgo(p.last_scanned)}</span>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: p.status === "complete" ? XG : p.status === "scanning" ? "#FFAA00" : "#FF4444" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Compare feature */}
+      {profiles.length >= 2 && (
+        <Card>
+          <SectionHeader>Compare Profiles</SectionHeader>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <select value={compareA || ""} onChange={e => setCompareA(e.target.value)} style={{
+              flex: 1, minWidth: 120, padding: "8px 12px", borderRadius: 6,
+              border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)",
+              color: "#fff", fontSize: 11, fontFamily: mono, outline: "none",
+            }}>
+              <option value="">Profile A</option>
+              {profiles.map(p => <option key={p.user_id} value={p.user_id}>@{p.handle}</option>)}
+            </select>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontFamily: mono }}>vs</span>
+            <select value={compareB || ""} onChange={e => setCompareB(e.target.value)} style={{
+              flex: 1, minWidth: 120, padding: "8px 12px", borderRadius: 6,
+              border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)",
+              color: "#fff", fontSize: 11, fontFamily: mono, outline: "none",
+            }}>
+              <option value="">Profile B</option>
+              {profiles.map(p => <option key={p.user_id} value={p.user_id}>@{p.handle}</option>)}
+            </select>
+            <button onClick={runCompare} disabled={!compareA || !compareB || compareA === compareB} style={{
+              padding: "8px 16px", borderRadius: 6, border: `1px solid ${XG}30`,
+              background: `${XG}10`, color: XG, fontSize: 11, fontFamily: mono,
+              cursor: !compareA || !compareB ? "not-allowed" : "pointer",
+              opacity: !compareA || !compareB ? 0.4 : 1,
+            }}>Compare</button>
+          </div>
+
+          {compareResult && (
+            <div style={{ marginTop: 16 }}>
+              <div className="grid-2" style={{ marginBottom: 12 }}>
+                {["a", "b"].map(side => {
+                  const pr = compareResult.profiles[side];
+                  const eng = compareResult.comparison?.engagementSummary?.[side];
+                  const t = compareResult.comparison?.tone?.[side];
+                  return (
+                    <div key={side} style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: mono, marginBottom: 8 }}>@{pr?.handle}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: mono }}>Followers</span>
+                          <span style={{ fontSize: 10, color: "#fff", fontFamily: mono }}>{fmtNum(pr?.followers)}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: mono }}>Avg Likes</span>
+                          <span style={{ fontSize: 10, color: "#fff", fontFamily: mono }}>{eng?.avgLikes || "—"}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: mono }}>Eng Rate</span>
+                          <span style={{ fontSize: 10, color: XG, fontFamily: mono }}>{eng?.overallEngRate || "—"}%</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: mono }}>Directness</span>
+                          <span style={{ fontSize: 10, color: "#fff", fontFamily: mono }}>{t?.directness || "—"}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: mono }}>Hype</span>
+                          <span style={{ fontSize: 10, color: "#fff", fontFamily: mono }}>{t?.hype || "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Selected profile detail */}
+      {selProfile && (
+        <>
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: "#fff", fontFamily: sans }}>{selProfile.name}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: mono }}>@{selProfile.handle}</div>
+                {selProfile.bio && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 6, lineHeight: 1.5, maxWidth: 400 }}>{selProfile.bio}</div>}
+              </div>
+              <button onClick={() => handleDelete(selProfile.user_id)} style={{
+                padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,68,68,0.15)",
+                background: "rgba(255,68,68,0.04)", color: "#FF4444", fontSize: 10,
+                fontFamily: mono, cursor: "pointer",
+              }}>Delete</button>
+            </div>
+            <div className="grid-4">
+              <StatCard label="Followers" value={fmtNum(selProfile.followers)} />
+              <StatCard label="Following" value={fmtNum(selProfile.following)} />
+              <StatCard label="Tweets" value={fmtNum(selProfile.tweet_count)} />
+              <StatCard label="Collected" value={fmtNum(selectedProfile?.tweetCount)} />
+            </div>
+          </Card>
+
+          {/* Engagement summary */}
+          {perfSummary && (
+            <div className="grid-4">
+              <StatCard label="Avg Likes" value={perfSummary.avgLikes} />
+              <StatCard label="Avg RTs" value={perfSummary.avgRetweets} />
+              <StatCard label="Avg Impressions" value={fmtNum(perfSummary.avgImpressions)} />
+              <StatCard label="Eng Rate" value={`${perfSummary.overallEngRate}%`} sub={perfSummary.totalTweets + " tweets"} />
+            </div>
+          )}
+
+          {/* Voice fingerprint */}
+          {tone.directness != null && (
+            <Card>
+              <SectionHeader>Voice Fingerprint</SectionHeader>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {["directness", "technical", "hype", "sarcasm"].map(key => (
+                  <VoiceMeter key={key} label={key} value={tone[key] || 0} />
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Content types + hashtags */}
+          <div className="grid-2">
+            {typePerf.length > 0 && (
+              <Card>
+                <SectionHeader>Content Types</SectionHeader>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {typePerf.sort((a, b) => (b.engagementRate || 0) - (a.engagementRate || 0)).map((ct, i) => (
+                    <BarRow key={i} label={ct.type} value={ct.engagementRate || 0} maxValue={Math.max(...typePerf.map(t => t.engagementRate || 0))} suffix="%" labelWidth={60} />
+                  ))}
+                </div>
+              </Card>
+            )}
+            {hashFreq.length > 0 && (
+              <Card>
+                <SectionHeader>Top Hashtags</SectionHeader>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {hashFreq.slice(0, 8).map((h, i) => (
+                    <BarRow key={i} label={`#${h.tag}`} value={h.count} maxValue={hashFreq[0]?.count || 1} color="#00AAFF" labelWidth={90} />
+                  ))}
+                </div>
+              </Card>
+            )}
+          </div>
+
+          {/* Vocabulary + writing metrics */}
+          <div className="grid-2">
+            {vocab.topWords?.length > 0 && (
+              <Card>
+                <SectionHeader>Top Vocabulary</SectionHeader>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {vocab.topWords.slice(0, 15).map((w, i) => (
+                    <span key={i} style={{ padding: "3px 10px", borderRadius: 20, fontSize: 10, background: `${XG}10`, border: `1px solid ${XG}20`, color: XG, fontFamily: mono }}>{w.word}</span>
+                  ))}
+                </div>
+              </Card>
+            )}
+            <Card>
+              <SectionHeader>Writing Metrics</SectionHeader>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[
+                  ["Avg length", `${avgLen.average || "—"} chars`],
+                  ["Words/tweet", `${vocab.avgWordsPerTweet || "—"}`],
+                  ["Emoji rate", `${emoji.pctWithEmoji || 0}%`],
+                  ["Tweets/day", `${postFreq.tweetsPerDay || "—"}`],
+                  ["Diversity", `${vocab.lexicalDiversity || "—"}`],
+                ].map(([l, v], i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: mono }}>{l}</span>
+                    <span style={{ fontSize: 10, color: "#fff", fontFamily: mono }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+          {/* Top tweets */}
+          {selTweets.length > 0 && (
+            <Card>
+              <SectionHeader>Top Tweets by Likes</SectionHeader>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {selTweets.map((t, i) => (
+                  <div key={i} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.04)" }}>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", lineHeight: 1.5, marginBottom: 6, wordBreak: "break-word" }}>{t.text?.substring(0, 180)}</div>
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: mono }}>♥ {t.likes}</span>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: mono }}>↻ {t.retweets}</span>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: mono }}>👁 {fmtNum(t.impressions)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {peakHours.length > 0 && (
+            <InsightBox>PEAK POSTING HOURS: {peakHours.map(h => `${h.hour}:00 UTC (${h.count})`).join(", ")}</InsightBox>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Dashboard ─────────────────────────────────────
 
 export default function XenuDashboard() {
@@ -760,6 +1091,7 @@ export default function XenuDashboard() {
     { id: "network", label: "Network" },
     { id: "voice", label: "Voice" },
     { id: "signals", label: "Signals" },
+    { id: "scan", label: "Scan" },
     { id: "collectors", label: "Collectors" },
   ];
 
@@ -855,6 +1187,7 @@ export default function XenuDashboard() {
         {activeTab === "network" && <NetworkTab />}
         {activeTab === "voice" && <VoiceTab />}
         {activeTab === "signals" && <SignalsTab />}
+        {activeTab === "scan" && <ScanTab />}
         {activeTab === "collectors" && <CollectorsTab />}
       </main>
 

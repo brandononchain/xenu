@@ -12,6 +12,14 @@ import {
 } from "../api/x-client.js";
 import { runAllCollectors, runCollector, collectors } from "../collectors/index.js";
 import { runAllAnalyzers, runAnalyzer, analyzers } from "../analysis/index.js";
+import {
+  fullScan,
+  getScannedProfiles,
+  getScanResults,
+  getScanResultsByHandle,
+  deleteScan,
+  compareProfiles,
+} from "../scanner/index.js";
 import { createLogger } from "../logger.js";
 
 const log = createLogger("server");
@@ -272,6 +280,56 @@ app.post("/api/analyze/:name", async (c) => {
   }
   const result = await runAnalyzer(name);
   return c.json({ analyzer: name, ...result });
+});
+
+// ─── Scanner Routes (External Profile Intel) ────────────
+
+/** Scan a public profile: fetch tweets + run analysis */
+app.post("/api/scan/:handle", async (c) => {
+  const handle = c.req.param("handle");
+  if (!handle || handle.length < 2) {
+    return c.json({ error: "Invalid handle" }, 400);
+  }
+  log.info("Scan requested", { handle });
+  const result = await fullScan(handle);
+  return c.json(result);
+});
+
+/** List all scanned profiles */
+app.get("/api/scans", (c) => {
+  const profiles = getScannedProfiles();
+  return c.json({ data: profiles, count: profiles.length });
+});
+
+/** Get full scan results for a profile (by user ID) */
+app.get("/api/scans/:userId", (c) => {
+  const userId = c.req.param("userId");
+  const results = getScanResults(userId);
+  if (!results.profile) return c.json({ error: "Profile not found" }, 404);
+  return c.json(results);
+});
+
+/** Get scan results by handle */
+app.get("/api/scans/handle/:handle", (c) => {
+  const handle = c.req.param("handle");
+  const results = getScanResultsByHandle(handle);
+  if (!results) return c.json({ error: "Profile not scanned" }, 404);
+  return c.json(results);
+});
+
+/** Compare two scanned profiles */
+app.get("/api/scans/compare/:userIdA/:userIdB", (c) => {
+  const { userIdA, userIdB } = c.req.param();
+  const comparison = compareProfiles(userIdA, userIdB);
+  if (!comparison) return c.json({ error: "One or both profiles not found" }, 404);
+  return c.json(comparison);
+});
+
+/** Delete a scanned profile */
+app.delete("/api/scans/:userId", (c) => {
+  const userId = c.req.param("userId");
+  deleteScan(userId);
+  return c.json({ deleted: true, userId });
 });
 
 // ─── Cron Jobs ──────────────────────────────────────────

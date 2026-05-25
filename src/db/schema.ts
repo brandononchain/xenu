@@ -170,4 +170,82 @@ CREATE INDEX IF NOT EXISTS idx_mentions_created ON mentions(created_at);
 CREATE INDEX IF NOT EXISTS idx_mentions_sentiment ON mentions(sentiment);
 CREATE INDEX IF NOT EXISTS idx_following_snapshot ON following_snapshots(snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_collector_runs ON collector_runs(collector, started_at);
+
+-- ═══════════════════════════════════════════════════════
+-- ─── Scanner: External Profile Intelligence ───────────
+-- ═══════════════════════════════════════════════════════
+
+-- ─── Scanned profiles registry ─────────────────────────
+CREATE TABLE IF NOT EXISTS scanned_profiles (
+  user_id TEXT PRIMARY KEY,
+  handle TEXT NOT NULL,
+  name TEXT,
+  bio TEXT,
+  followers INTEGER DEFAULT 0,
+  following INTEGER DEFAULT 0,
+  tweet_count INTEGER DEFAULT 0,
+  listed_count INTEGER DEFAULT 0,
+  verified INTEGER DEFAULT 0,
+  profile_image_url TEXT,
+  location TEXT,
+  created_at TEXT,
+  first_scanned TEXT DEFAULT (datetime('now')),
+  last_scanned TEXT DEFAULT (datetime('now')),
+  scan_count INTEGER DEFAULT 1,
+  status TEXT DEFAULT 'pending'  -- pending, scanning, complete, error
+);
+
+-- ─── Scanned tweets (separate from your own) ──────────
+CREATE TABLE IF NOT EXISTS scanned_tweets (
+  id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  tweet_type TEXT NOT NULL DEFAULT 'original',
+  in_reply_to_user_id TEXT,
+  conversation_id TEXT,
+  has_media INTEGER DEFAULT 0,
+  media_type TEXT,
+  hashtags TEXT,
+  mentions TEXT,
+  urls TEXT,
+  lang TEXT,
+  likes INTEGER DEFAULT 0,
+  retweets INTEGER DEFAULT 0,
+  replies INTEGER DEFAULT 0,
+  impressions INTEGER DEFAULT 0,
+  bookmarks INTEGER DEFAULT 0,
+  quote_count INTEGER DEFAULT 0,
+  collected_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (id, user_id)
+);
+
+-- ─── Scanned profile analysis results ──────────────────
+CREATE TABLE IF NOT EXISTS scanned_patterns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  pattern_type TEXT NOT NULL,
+  pattern_key TEXT NOT NULL,
+  pattern_value TEXT NOT NULL,
+  confidence REAL DEFAULT 0,
+  sample_size INTEGER DEFAULT 0,
+  computed_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, pattern_type, pattern_key)
+);
+
+-- ─── Scanned voice fingerprint ─────────────────────────
+CREATE TABLE IF NOT EXISTS scanned_voice (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  value TEXT NOT NULL,
+  computed_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, metric)
+);
+
+-- ─── Scanner indexes ──────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_scanned_profiles_handle ON scanned_profiles(handle);
+CREATE INDEX IF NOT EXISTS idx_scanned_tweets_user ON scanned_tweets(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_scanned_patterns_user ON scanned_patterns(user_id, pattern_type);
+CREATE INDEX IF NOT EXISTS idx_scanned_voice_user ON scanned_voice(user_id);
 `;
