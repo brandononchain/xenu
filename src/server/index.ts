@@ -19,6 +19,8 @@ import {
   getScanResultsByHandle,
   deleteScan,
   compareProfiles,
+  runOverlapAnalysis,
+  runSimilarityAnalysis,
 } from "../scanner/index.js";
 import { createLogger } from "../logger.js";
 
@@ -330,6 +332,23 @@ app.delete("/api/scans/:userId", (c) => {
   const userId = c.req.param("userId");
   deleteScan(userId);
   return c.json({ deleted: true, userId });
+});
+
+/** Run follower overlap analysis (separate — costs extra API reads) */
+app.post("/api/scans/:userId/overlap", async (c) => {
+  const userId = c.req.param("userId");
+  log.info("Overlap analysis requested", { userId });
+  const result = await runOverlapAnalysis(userId);
+  if (!result) return c.json({ error: "Could not compute overlap — ensure your account has followers data" }, 400);
+  return c.json(result);
+});
+
+/** Run content similarity scoring */
+app.get("/api/scans/:userId/similarity", (c) => {
+  const userId = c.req.param("userId");
+  const result = runSimilarityAnalysis(userId);
+  if (!result) return c.json({ error: "Could not compute similarity — ensure both profiles have voice data" }, 400);
+  return c.json(result);
 });
 
 // ─── Cron Jobs ──────────────────────────────────────────
