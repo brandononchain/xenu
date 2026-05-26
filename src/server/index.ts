@@ -490,6 +490,7 @@ export function startServer() {
   serve({
     fetch: app.fetch,
     port: config.server.port,
+    hostname: "0.0.0.0",
   });
 
   log.info(`
