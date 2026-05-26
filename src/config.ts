@@ -15,10 +15,10 @@ function optional(key: string, fallback = ""): string {
 
 export const config = {
   x: {
-    clientId: required("X_CLIENT_ID"),
-    clientSecret: required("X_CLIENT_SECRET"),
+    clientId: optional("X_CLIENT_ID"),
+    clientSecret: optional("X_CLIENT_SECRET"),
     callbackUrl: optional("X_CALLBACK_URL", "http://localhost:3400/auth/callback"),
-    userId: required("X_USER_ID"),
+    userId: optional("X_USER_ID"),
     userHandle: optional("X_USER_HANDLE", "brandononchain"),
   },
   tokens: {
