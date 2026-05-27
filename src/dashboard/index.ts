@@ -194,7 +194,7 @@ let activeTab = 'overview';
 
 function renderTabs() {
   document.getElementById('tabs').innerHTML = TABS.map(t =>
-    '<button class="'+(activeTab===t.id?'active':'')+'" onclick="switchTab(\''+t.id+'\')">'+t.label+'</button>'
+    '<button class="'+(activeTab===t.id?'active':'')+'" onclick="switchTab(\x27'+t.id+'\x27)">'+t.label+'</button>'
   ).join('');
 }
 
@@ -377,13 +377,13 @@ async function renderScan() {
   scanProfiles = scans?.data || [];
 
   let html = card(sectionHdr('Scan External Profile')+
-    '<div class="scan-input"><input id="scan-handle" placeholder="@handle" onkeydown="if(event.key===\'Enter\')doScan()"><button class="btn btn-primary" id="scan-btn" onclick="doScan()">Scan</button></div>'+
+    '<div class="scan-input"><input id="scan-handle" placeholder="@handle" onkeydown="if(event.key===\x27Enter\x27)doScan()"><button class="btn btn-primary" id="scan-btn" onclick="doScan()">Scan</button></div>'+
     '<div id="scan-status"></div>');
 
   if (scanProfiles.length > 0) {
     html += '<div style="margin-top:20px">'+card(sectionHdr('Scanned Profiles ('+scanProfiles.length+')')+
       '<div id="scan-list">'+scanProfiles.map((p,i)=>
-        '<div class="profile-row'+(selectedScan?.user_id===p.user_id?' active':'')+'" onclick="loadScanProfile(\''+p.user_id+'\')">'+
+        '<div class="profile-row'+(selectedScan?.user_id===p.user_id?' active':'')+'" onclick="loadScanProfile(\x27'+p.user_id+'\x27)">'+
         '<div style="flex:1;min-width:100px"><div style="font-size:12px;color:var(--t1);font-family:var(--mono)">@'+p.handle+'</div><div style="font-size:10px;color:var(--t3);font-family:var(--mono)">'+(p.name||'')+'</div></div>'+
         '<div style="display:flex;gap:12px;align-items:center"><span style="font-size:10px;color:var(--t3);font-family:var(--mono)">'+fmtNum(p.followers)+' followers</span><span style="font-size:9px;color:var(--t4);font-family:var(--mono)">'+timeAgo(p.last_scanned)+'</span><div class="collector-dot" style="background:'+(p.status==='complete'?'var(--g)':p.status==='scanning'?'var(--yellow)':'var(--red)')+'"></div></div></div>'
       ).join('')+'</div>')+'</div>';
@@ -446,7 +446,7 @@ async function loadScanProfile(userId) {
     '<div style="font-size:16px;font-weight:600">'+p.name+'</div>'+
     '<div style="font-size:12px;color:var(--t3);font-family:var(--mono)">@'+p.handle+'</div>'+
     (p.bio?'<div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5;max-width:400px">'+p.bio+'</div>':'')+
-    '</div><button class="btn-danger" onclick="deleteScanProfile(\''+p.user_id+'\')">Delete</button></div>'+
+    '</div><button class="btn-danger" onclick="deleteScanProfile(\x27'+p.user_id+'\x27)">Delete</button></div>'+
     '<div class="grid-4">'+stat('Followers',fmtNum(p.followers))+stat('Following',fmtNum(p.following))+stat('Tweets',fmtNum(p.tweet_count))+stat('Collected',fmtNum(res.tweetCount))+'</div>');
 
   // Engagement summary
@@ -524,7 +524,7 @@ async function renderCollectors() {
 
   html += card(sectionHdr('Manual Triggers')+'<div style="display:flex;flex-direction:column;gap:6px" id="trigger-btns">'+
     ['all','timeline','engagement','mentions','audience','following','bookmarks','sentiment'].map(n=>
-      '<button class="btn-trigger" onclick="triggerCollector(\''+n+'\',this)">▶ '+n+'</button>').join('')+
+      '<button class="btn-trigger" onclick="triggerCollector(\x27'+n+'\x27,this)">▶ '+n+'</button>').join('')+
     '<div style="height:1px;background:var(--border);margin:4px 0"></div>'+
     '<button class="btn-trigger" style="border-color:rgba(0,255,136,.12);color:var(--g)" onclick="triggerAnalysis(this)">⚡ Run Analysis Engine</button></div>');
   html += '</div>';
