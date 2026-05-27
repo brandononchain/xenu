@@ -36,6 +36,7 @@ import {
 } from "../scanner/watch.js";
 import { createLogger } from "../logger.js";
 import docsRouter from "../docs/index.js";
+import dashboardRouter from "../dashboard/index.js";
 
 const log = createLogger("server");
 const app = new Hono();
@@ -44,9 +45,10 @@ const app = new Hono();
 
 app.use("*", cors());
 
-// ─── Doc Center ─────────────────────────────────────────
+// ─── Dashboard & Doc Center ─────────────────────────────
 
 app.route("/docs", docsRouter);
+app.route("/", dashboardRouter);
 
 // ─── Auth Routes ────────────────────────────────────────
 
