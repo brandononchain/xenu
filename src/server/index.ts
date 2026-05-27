@@ -48,7 +48,8 @@ app.use("*", cors());
 // ─── Dashboard & Doc Center ─────────────────────────────
 
 app.route("/docs", docsRouter);
-app.route("/", dashboardRouter);
+
+// Dashboard must be registered AFTER all API routes (see bottom of file)
 
 // ─── Auth Routes ────────────────────────────────────────
 
@@ -437,6 +438,10 @@ app.get("/api/scan/batch", (c) => {
   const jobs = listBatchJobs();
   return c.json({ data: jobs });
 });
+
+// ─── Dashboard (must be AFTER all API/auth routes) ──────
+
+app.route("/", dashboardRouter);
 
 // ─── Cron Jobs ──────────────────────────────────────────
 
