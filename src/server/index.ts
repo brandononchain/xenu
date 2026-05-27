@@ -36,7 +36,7 @@ import {
 } from "../scanner/watch.js";
 import { createLogger } from "../logger.js";
 import docsRouter from "../docs/index.js";
-import dashboardRouter from "../dashboard/index.js";
+import { DASHBOARD_HTML } from "../dashboard/index.js";
 
 const log = createLogger("server");
 const app = new Hono();
@@ -48,8 +48,6 @@ app.use("*", cors());
 // ─── Dashboard & Doc Center ─────────────────────────────
 
 app.route("/docs", docsRouter);
-
-// Dashboard must be registered AFTER all API routes (see bottom of file)
 
 // ─── Auth Routes ────────────────────────────────────────
 
@@ -439,9 +437,9 @@ app.get("/api/scan/batch", (c) => {
   return c.json({ data: jobs });
 });
 
-// ─── Dashboard (must be AFTER all API/auth routes) ──────
+// ─── Dashboard ──────────────────────────────────────────
 
-app.route("/", dashboardRouter);
+app.get("/", (c) => c.html(DASHBOARD_HTML));
 
 // ─── Cron Jobs ──────────────────────────────────────────
 

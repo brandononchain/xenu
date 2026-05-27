@@ -1,14 +1,4 @@
-import { Hono } from "hono";
-
-const dashboard = new Hono();
-
-dashboard.get("/", (c) => {
-  return c.html(DASHBOARD_HTML);
-});
-
-export default dashboard;
-
-const DASHBOARD_HTML = `<!DOCTYPE html>
+export const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
